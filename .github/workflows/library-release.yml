@@ -1,0 +1,121 @@
+name: Library release
+
+# Releases a Composables library to Maven Central with KPM. Called from each library's own
+# Release workflow; see README.md for the caller and the release rules.
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        description: patch, minor or major. Ignored when package.yml holds an unreleased version.
+        required: true
+        type: string
+      test-command:
+        description: Gradle tasks that must pass before publishing, for example "jvmTest testAndroidHostTest iosSimulatorArm64Test".
+        required: true
+        type: string
+      runs-on:
+        description: Runner. Use macOS when the library has Apple targets.
+        required: false
+        type: string
+        default: macos-latest
+      android-packages:
+        description: Android SDK packages to install, or empty for none.
+        required: false
+        type: string
+        default: ''
+      java-version:
+        required: false
+        type: string
+        default: '17'
+      kpm-version:
+        required: false
+        type: string
+        default: '0.4.0'
+      tools-ref:
+        description: Ref of composablehorizons/.github to take the release script from.
+        required: false
+        type: string
+        default: main
+
+jobs:
+  release:
+    runs-on: ${{ inputs.runs-on }}
+    environment: maven-central
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    env:
+      RELEASE_BUMP: ${{ inputs.bump }}
+      TEST_COMMAND: ${{ inputs.test-command }}
+      KPM_VERSION: ${{ inputs.kpm-version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/checkout@v5
+        with:
+          repository: composablehorizons/.github
+          ref: ${{ inputs.tools-ref }}
+          path: .release-tools
+      - uses: gradle/actions/wrapper-validation@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: gradle/actions/setup-gradle@v5
+      - if: inputs.android-packages != ''
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ${{ inputs.android-packages }}
+          log-accepted-android-sdk-licenses: 'false'
+      - name: Install KPM
+        run: npm install --global "@composablehorizons/kpm@$KPM_VERSION"
+      - name: Prepare version, changelog, commit and tag
+        id: prepare
+        env:
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 .release-tools/scripts/prepare-library-release.py "$RELEASE_BUMP"
+      - name: Test and build every publication
+        run: ./gradlew $TEST_COMMAND publishToMavenLocal --no-configuration-cache --console=plain
+      - name: Push the release commit and tag
+        if: steps.prepare.outputs.mode == 'new'
+        env:
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: git push --atomic origin HEAD:main "refs/tags/$TAG"
+      - name: Publish to Maven Central
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralDeploymentValidation: NONE
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.OSSRH_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.OSSRH_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+        run: |
+          for name in ORG_GRADLE_PROJECT_mavenCentralUsername ORG_GRADLE_PROJECT_mavenCentralPassword ORG_GRADLE_PROJECT_signingInMemoryKey; do
+            test -n "${!name}" || { echo "::error::Missing publishing credential: $name"; exit 1; }
+          done
+          kpm publish
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.prepare.outputs.tag }}
+          NOTES: ${{ runner.temp }}/release-notes.md
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft=false --notes-file "$NOTES"
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$NOTES"
+          fi
