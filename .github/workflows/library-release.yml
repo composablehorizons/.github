@@ -85,6 +85,7 @@ jobs:
         env:
           RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
         run: |
+          echo '/.release-tools/' >> .git/info/exclude
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           python3 .release-tools/scripts/prepare-library-release.py "$RELEASE_BUMP"
