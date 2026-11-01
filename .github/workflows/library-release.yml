@@ -98,7 +98,7 @@ jobs:
         run: git push --atomic origin HEAD:main "refs/tags/$TAG"
       - name: Publish to Maven Central
         env:
-          ORG_GRADLE_PROJECT_mavenCentralDeploymentValidation: NONE
+          ORG_GRADLE_PROJECT_mavenCentralDeploymentValidation: VALIDATED
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.OSSRH_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
