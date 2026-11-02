@@ -17,25 +17,14 @@ Writes `version`, `tag` and `mode` (new or retry) to $GITHUB_OUTPUT when set, an
 release notes to the path given by RELEASE_NOTES_FILE.
 """
 
-import datetime
 import os
 import re
-import subprocess
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-UNRELEASED = re.compile(r"^## (\[)?Unreleased(\])?[ \t]*\n", re.MULTILINE)
-
-
-def run(*args):
-    return subprocess.check_output(args, text=True).strip()
-
-
-def fail(message):
-    print(f"::error::{message}")
-    sys.exit(1)
+from release import changelog_text, date_unreleased, fail, output, run, section_notes
 
 
 def package_field(name):
@@ -55,32 +44,6 @@ def published(group, artifact, version):
         return False
 
 
-def section_notes(changelog, version):
-    match = re.search(
-        rf"^## \[?{re.escape(version)}\]? - \d{{4}}-\d{{2}}-\d{{2}}[ \t]*\n(.*?)(?=^## |\Z)",
-        changelog,
-        re.MULTILINE | re.DOTALL,
-    )
-    return match.group(1).strip() if match else ""
-
-
-def date_unreleased(changelog, version):
-    match = UNRELEASED.search(changelog)
-    if not match:
-        fail("CHANGELOG.md has no Unreleased section.")
-    following = re.compile(r"^## ", re.MULTILINE).search(changelog, match.end())
-    end = following.start() if following else len(changelog)
-    notes = changelog[match.end():end].strip()
-    if not notes:
-        fail("The Unreleased section of CHANGELOG.md is empty, so there is nothing to release.")
-    bracketed = match.group(1) is not None
-    date = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-    unreleased = "## [Unreleased]" if bracketed else "## Unreleased"
-    heading = f"## [{version}] - {date}" if bracketed else f"## {version} - {date}"
-    dated = f"{unreleased}\n\n{heading}\n\n{notes}\n\n"
-    return changelog[:match.start()] + dated + changelog[end:].lstrip("\n"), notes
-
-
 def update_readme(group, artifact, version):
     readme = Path("README.md")
     if not readme.exists():
@@ -95,22 +58,6 @@ def update_readme(group, artifact, version):
     else:
         print(f"::warning::README.md has no {group}:{artifact}:<version> line to update.")
     return count > 0
-
-
-def changelog_text():
-    path = Path("CHANGELOG.md")
-    if not path.exists():
-        fail("The library has no CHANGELOG.md.")
-    return path.read_text()
-
-
-def output(**values):
-    path = os.environ.get("GITHUB_OUTPUT")
-    lines = "".join(f"{key}={value}\n" for key, value in values.items())
-    if path:
-        with open(path, "a") as file:
-            file.write(lines)
-    print(lines, end="")
 
 
 def main():

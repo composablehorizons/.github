@@ -1,0 +1,82 @@
+name: CLI release
+
+# Releases a Go CLI as prebuilt binaries on GitHub Releases with GoReleaser. Called from each
+# CLI's own Release workflow; see README.md for the caller and the release rules.
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        description: patch, minor or major. Ignored when the latest tag has no published release.
+        required: true
+        type: string
+      test-command:
+        description: Command that must pass before publishing.
+        required: false
+        type: string
+        default: go vet ./... && go test ./...
+      go-version-file:
+        required: false
+        type: string
+        default: go.mod
+      goreleaser-version:
+        required: false
+        type: string
+        default: '~> v2'
+      tools-ref:
+        description: Ref of composablehorizons/.github to take the release script from.
+        required: false
+        type: string
+        default: main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    env:
+      RELEASE_BUMP: ${{ inputs.bump }}
+      TEST_COMMAND: ${{ inputs.test-command }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/checkout@v5
+        with:
+          repository: composablehorizons/.github
+          ref: ${{ inputs.tools-ref }}
+          path: .release-tools
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+      - name: Prepare version, changelog, commit and tag
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+        run: |
+          echo '/.release-tools/' >> .git/info/exclude
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 .release-tools/scripts/prepare-cli-release.py "$RELEASE_BUMP"
+      - name: Test
+        run: eval "$TEST_COMMAND"
+      - name: Push the release commit and tag
+        if: steps.prepare.outputs.mode == 'new'
+        env:
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: git push --atomic origin HEAD:main "refs/tags/$TAG"
+      - name: Build and publish the GitHub Release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: ${{ inputs.goreleaser-version }}
+          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
