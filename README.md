@@ -65,7 +65,8 @@ jobs:
       bump: ${{ inputs.bump }}
     permissions:
       contents: write
-    secrets: inherit
+    secrets:
+      HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
 ```
 
 Run **Release** in the CLI's Actions tab and pick patch, minor or major. The workflow:
@@ -78,4 +79,6 @@ Run **Release** in the CLI's Actions tab and pick patch, minor or major. The wor
 
 If publishing fails after the tag was pushed, run Release again: when the latest tag has no published GitHub Release, it retries that tag instead of bumping.
 
-Requirements in the CLI: `go.mod` at the root, a `CHANGELOG.md` with an `Unreleased` section, and a `.goreleaser.yaml` that sets `release.replace_existing_artifacts: true` so retries can replace partial uploads. Publishing to GitHub Releases needs no secrets. A CLI that publishes a Homebrew cask to `alexstyl/homebrew-tap` from `.goreleaser.yaml` needs the `HOMEBREW_TAP_DEPLOY_KEY` secret: the private half of a deploy key with write access to the tap.
+Requirements in the CLI: `go.mod` at the root, a `CHANGELOG.md` with an `Unreleased` section, and a `.goreleaser.yaml` that sets `release.replace_existing_artifacts: true` so retries can replace partial uploads. Publishing to GitHub Releases needs no secrets. A CLI that publishes a Homebrew cask to `alexstyl/homebrew-tap` from `.goreleaser.yaml` needs the `HOMEBREW_TAP_DEPLOY_KEY` secret, the private half of a deploy key with write access to the tap, passed explicitly as above: `secrets: inherit` does not reach a workflow in another organization. The release fails before publishing when the key is missing.
+
+Do not disable GoReleaser's `changelog`: that also drops the release notes taken from `CHANGELOG.md`.
