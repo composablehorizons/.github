@@ -38,7 +38,22 @@ Run **Release** in the library's Actions tab and pick patch, minor or major. The
 4. Runs `test-command` and `publishToMavenLocal` to build every publication.
 5. Pushes the commit and tag, publishes with `kpm publish`, waits until Maven Central has validated the deployment (a rejected release fails the run), and publishes the GitHub Release with the changelog section as its text.
 
-If publishing fails after the tag was pushed, run Release again: when the tagged version is not on Maven Central yet, it retries that tag instead of bumping.
+If publishing fails after the tag was pushed, run Release again: when the tagged version is not on Maven Central yet, it retries that tag instead of bumping. A retry publishes only the packages that are missing.
+
+### Libraries with a Gradle plugin
+
+A library that also publishes a Gradle plugin keeps the plugin in its own module with its own `package.yml`. Release both at the same version by naming the plugin's directory in `extra-packages`, and its plugin ID in `gradle-plugin-id` so the README's `id("...") version "..."` line stays current. Google Fonts does this:
+
+```yaml
+    with:
+      bump: ${{ inputs.bump }}
+      test-command: jvmTest iosSimulatorArm64Test :gradle-plugin:check
+      android-packages: 'platforms;android-37.0 build-tools;37.0.0'
+      extra-packages: gradle-plugin
+      gradle-plugin-id: com.composables.google-fonts
+```
+
+`extra-packages` takes several directories separated by spaces.
 
 Requirements in the library: the KPM Gradle plugin 0.6.0 or later (older versions skip the validation wait), `package.yml` with `groupId`, `artifactId` and `version`, a `CHANGELOG.md` with an `Unreleased` section, the Gradle wrapper at the root, and access to the `maven-central` environment and the organization secrets `OSSRH_USERNAME`, `OSSRH_PASSWORD`, `SIGNING_KEY_ID`, `SIGNING_PASSWORD` and `SIGNING_KEY`.
 
