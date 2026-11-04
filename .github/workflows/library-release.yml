@@ -28,6 +28,16 @@ on:
         required: false
         type: string
         default: '17'
+      extra-packages:
+        description: Directories of further KPM packages released with the root at the same version, separated by spaces, such as "gradle-plugin".
+        required: false
+        type: string
+        default: ''
+      gradle-plugin-id:
+        description: Gradle plugin ID whose `id("...") version "..."` line in the README is updated with each release.
+        required: false
+        type: string
+        default: ''
       kpm-version:
         required: false
         type: string
@@ -54,6 +64,8 @@ jobs:
       RELEASE_BUMP: ${{ inputs.bump }}
       TEST_COMMAND: ${{ inputs.test-command }}
       KPM_VERSION: ${{ inputs.kpm-version }}
+      EXTRA_PACKAGES: ${{ inputs.extra-packages }}
+      GRADLE_PLUGIN_ID: ${{ inputs.gradle-plugin-id }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -103,11 +115,14 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          PACKAGES: ${{ steps.prepare.outputs.publish }}
         run: |
           for name in ORG_GRADLE_PROJECT_mavenCentralUsername ORG_GRADLE_PROJECT_mavenCentralPassword ORG_GRADLE_PROJECT_signingInMemoryKey; do
             test -n "${!name}" || { echo "::error::Missing publishing credential: $name"; exit 1; }
           done
-          kpm publish
+          for directory in $PACKAGES; do
+            (cd "$directory" && kpm publish)
+          done
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

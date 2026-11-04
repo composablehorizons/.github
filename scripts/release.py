@@ -10,8 +10,8 @@ from pathlib import Path
 UNRELEASED = re.compile(r"^## (\[)?Unreleased(\])?[ \t]*\n", re.MULTILINE)
 
 
-def run(*args):
-    return subprocess.check_output(args, text=True).strip()
+def run(*args, cwd=None):
+    return subprocess.check_output(args, text=True, cwd=cwd).strip()
 
 
 def fail(message):
