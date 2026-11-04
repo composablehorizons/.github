@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Prepares a library release for the shared release workflow.
 
-Run from the library's root, where package.yml, CHANGELOG.md and the Gradle wrapper live.
+Run from the repository root, where CHANGELOG.md, README.md and the Gradle wrapper live.
+The library's package.yml is in PACKAGE_DIRECTORY (default: the root), such as "library"
+when the library is a module next to a demo app.
 
 Packages listed in EXTRA_PACKAGES (directories, separated by spaces) are released with the
 root package at the same version, such as a library's Gradle plugin. GRADLE_PLUGIN_ID names a
@@ -83,9 +85,10 @@ def main():
     if run("git", "status", "--porcelain"):
         fail("The release needs a clean working tree.")
 
-    packages = ["."] + os.environ.get("EXTRA_PACKAGES", "").split()
+    main_package = os.environ.get("PACKAGE_DIRECTORY", "").strip() or "."
+    packages = [main_package] + os.environ.get("EXTRA_PACKAGES", "").split()
     plugin_id = os.environ.get("GRADLE_PLUGIN_ID", "").strip()
-    version = run("kpm", "version")
+    version = run("kpm", "version", cwd=main_package)
     tag = f"v{version}"
     notes_file = Path(os.environ.get("RELEASE_NOTES_FILE", "release-notes.md"))
 
@@ -102,8 +105,8 @@ def main():
             output(version=version, tag=tag, mode="retry", publish=" ".join(missing))
             return
         date_unreleased(changelog_text(), version)  # stop on an empty changelog before bumping
-        run("kpm", "version", bump, "--no-git-tag-version")
-        version = run("kpm", "version")
+        run("kpm", "version", bump, "--no-git-tag-version", cwd=main_package)
+        version = run("kpm", "version", cwd=main_package)
         tag = f"v{version}"
         if run("git", "tag", "--list", tag):
             fail(f"{tag} already exists; update package.yml before releasing.")
@@ -115,10 +118,10 @@ def main():
     files = ["CHANGELOG.md"]
     readme_updated = False
     for directory in packages:
-        if directory != ".":
+        if directory != main_package:
             run("kpm", "version", version, "--no-git-tag-version", cwd=directory)
         files.append(str(Path(directory, "package.yml")))
-        readme_updated |= update_readme_dependency(*coordinates(directory), version, required=directory == ".")
+        readme_updated |= update_readme_dependency(*coordinates(directory), version, required=directory == main_package)
     if plugin_id:
         readme_updated |= update_readme_plugin(plugin_id, version)
     if readme_updated:

@@ -28,6 +28,11 @@ on:
         required: false
         type: string
         default: '17'
+      package-directory:
+        description: Directory of the library's package.yml, such as "library" when the library is a module next to a demo app. Defaults to the repository root.
+        required: false
+        type: string
+        default: ''
       extra-packages:
         description: Directories of further KPM packages released with the root at the same version, separated by spaces, such as "gradle-plugin".
         required: false
@@ -64,6 +69,7 @@ jobs:
       RELEASE_BUMP: ${{ inputs.bump }}
       TEST_COMMAND: ${{ inputs.test-command }}
       KPM_VERSION: ${{ inputs.kpm-version }}
+      PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
       EXTRA_PACKAGES: ${{ inputs.extra-packages }}
       GRADLE_PLUGIN_ID: ${{ inputs.gradle-plugin-id }}
     steps:
