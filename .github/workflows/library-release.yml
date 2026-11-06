@@ -52,6 +52,19 @@ on:
         required: false
         type: string
         default: main
+    secrets:
+      # Optional so organization repositories can keep using `secrets: inherit`. Repositories
+      # outside the organization must pass these explicitly; `inherit` does not cross owners.
+      OSSRH_USERNAME:
+        required: false
+      OSSRH_PASSWORD:
+        required: false
+      SIGNING_KEY_ID:
+        required: false
+      SIGNING_PASSWORD:
+        required: false
+      SIGNING_KEY:
+        required: false
 
 jobs:
   release:
