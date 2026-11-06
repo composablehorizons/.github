@@ -36,7 +36,7 @@ from release import changelog_text, date_unreleased, fail, output, run, section_
 
 def package_field(name, directory="."):
     path = Path(directory, "package.yml")
-    match = re.search(rf"^{name}:\s*(\S+)\s*$", path.read_text(), re.MULTILINE)
+    match = re.search(rf"^[ \t]*{name}:\s*(\S+)\s*$", path.read_text(), re.MULTILINE)
     if not match:
         fail(f"{path} has no {name}.")
     return match.group(1)
